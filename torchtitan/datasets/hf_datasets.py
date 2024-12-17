@@ -30,11 +30,6 @@ def _process_c4_text(sample: Dict[str, Any]) -> str:
     return sample["text"]
 
 
-def _load_ebook_dataset(dataset_path: str):
-    """Load C4 dataset with default configuration."""
-    return load_dataset("json", data_files=dataset_path, streaming=True)
-
-
 def _process_ebook_text(sample: Dict[str, Any]) -> str:
     """Process C4 dataset sample text."""
     return sample["content"]
@@ -61,8 +56,8 @@ DATASETS = {
     ),
     'ebook':
         DatasetConfig(
-        path="'/cpfs01/shared/public/huanghaian/pretrain_data/20241107a/en/P~Knowledge~en~en-ebook~1.0.0~2.1'",
-        loader=_load_ebook_dataset,
+        path="/cpfs01/shared/public/huanghaian/pretrain_data/20241107a/en/P~Knowledge~en~en-ebook~1.0.0~2.1/",
+        loader=lambda path: load_dataset(path, split="train"),
         text_processor=_process_ebook_text,
         )
 }
@@ -183,9 +178,7 @@ class DPAwareDataLoader(StatefulDataLoader, Stateful):
             )
             return
         super().load_state_dict(pickle.loads(state_dict[self._rank_id]))
-from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import \
-    apply_activation_checkpointing
-from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+
 def build_hf_data_loader(
     dataset_name: str,
     dataset_path: Optional[str],
