@@ -55,6 +55,9 @@ class OptimizersInBackwardContainer(OptimizersContainer):
             else:
                 raise NotImplementedError(f"Optimizer {name} not added.")
 
+            # 要实现这个功能，需要将每个参数都新增一个 .step() 和 .zero_grad() 方法
+            # 因此代码代码必须增加，同时由于优化器组变了，在 SchedulersInBackwardContainer 中也要一起改变
+            # 否则不对
             def optim_hook(param) -> None:
                 optim_dict[param].step()
                 optim_dict[param].zero_grad()

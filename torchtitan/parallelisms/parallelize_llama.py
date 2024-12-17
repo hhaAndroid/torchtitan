@@ -262,9 +262,9 @@ def _apply_ac_to_transformer_block(module: nn.Module, ac_config):
                     func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0
                 )
                 return (
-                    CheckpointPolicy.MUST_SAVE
+                    CheckpointPolicy.MUST_SAVE  # 不使用重计算，等于没有 ac
                     if to_save
-                    else CheckpointPolicy.PREFER_RECOMPUTE
+                    else CheckpointPolicy.PREFER_RECOMPUTE  # 使用重计算，forward 时候不保存信息
                 )
 
             return _custom_policy

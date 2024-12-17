@@ -1,0 +1,7 @@
+conda activate torchtitan
+git clone https://github.com/hhaAndroid/torchtitan.git -b hha
+cd torchtitan
+pip install -r requirements.txt
+pip3 install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124 --force-reinstall
+
+CONFIG_FILE="./train_configs/llama3_8b_hha.toml" ./run_llama_train.sh

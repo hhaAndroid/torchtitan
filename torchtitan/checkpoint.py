@@ -60,6 +60,7 @@ class TrainState(Stateful):
         # Only checkpoint global_avg_losses and global_max_losses per log frequency
         # to avoid sync overhead in every iteration.
         global_avg_losses_bytes = BytesIO()
+        # 类似于 pickle.dump()，由于每张卡都是一样的，这种做法可以只保存一份，而不是每张卡都保存一份
         torch.save(self.global_avg_losses, global_avg_losses_bytes)
         global_max_losses_bytes = BytesIO()
         torch.save(self.global_max_losses, global_max_losses_bytes)
@@ -150,6 +151,8 @@ class SaveDone:
 
 
 def checkpoint_mp(recv, send):
+    # https://github.com/pytorch/torchtitan/pull/302
+    # 不过为啥要再开一个进程组？
     init_logger()
     os.environ["MASTER_PORT"] = str(int(os.environ["MASTER_PORT"]) + 2)
     os.environ["TORCHELASTIC_USE_AGENT_STORE"] = "False"
@@ -405,6 +408,7 @@ class CheckpointManager:
             raise ImportError(
                 "Please install the latest PyTorch nightly to use async checkpointing with pinned memory."
             ) from e
+        # 这一步是否有触发通信？
         state_dict = dcp.state_dict_saver._stateful_to_state_dict(self.states)
         if self.cpu_offload_state_dict is None:
             logger.debug(f"Preparing the CPU memory, {time.monotonic()=}.:.2f")
@@ -506,6 +510,11 @@ class CheckpointManager:
         }
         logger.info(f"Loading the checkpoint at step {step}.")
         begin = time.monotonic()
+        # 上述注释的意思是： dcp.load() 虽然会 in_place 的更新 states 中的 stateful 对象的状态，但是会返回新的对象，
+        # 也就是说更新前后 states 中的 stateful 对象不再和之前相同，这会导致 self.states 和 states 虽然值相同，但是对象不一样
+        # 在训练中会不断更新模型，此时他更新的是外面的 states，此时保存的依然是旧的，会出现问题
+        # 如果想验证，可以通过 id() 来查看，可能 pytorch 新版本已经修复了(看起来 2.5 没有修，2.6 修了)
+        # https://github.com/pytorch/pytorch/pull/138575/files 如果是 stateful 对象，则不能有额外的赋值
         dcp.load(
             states,
             checkpoint_id=self._create_checkpoint_id(step),

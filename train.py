@@ -161,6 +161,8 @@ def main(job_config: JobConfig):
     else:
         # apply PT-D Tensor Parallel, activation checkpointing, torch.compile, Data Parallel
         models_parallelize_fns[model_name](model, world_mesh, parallel_dims, job_config)
+        # 这地方细节应该不对，这样初始化和模型不切分前初始化肯定不一样
+        # 实际上应该改成这样，但是由于有 buffer 没有存储，有点问题 https://github.com/pytorch/torchtitan/pull/628/files
         model.to_empty(device=init_device)
         model.init_weights(buffer_device=buffer_device)
         model.train()

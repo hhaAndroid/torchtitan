@@ -155,6 +155,7 @@ class GarbageCollection:
             gc.collect(1)
 
 
+# profile 时候的参数
 TRACE_BUFFER_SIZE = "TORCH_NCCL_TRACE_BUFFER_SIZE"
 TRACE_FILE = "TORCH_NCCL_DEBUG_INFO_TEMP_FILE"
 DUMP_ON_TIMEOUT = "TORCH_NCCL_DUMP_ON_TIMEOUT"
@@ -221,6 +222,7 @@ def _get_distributed_backend(job_config):
     if device_type in torch.distributed.Backend.default_device_backend_map.keys():
         backend = torch.distributed.Backend.default_device_backend_map.get(device_type)
     if job_config.training.enable_cpu_offload:
+        # 必须要两个组都设置，否则 clip grad 时候会报错
         backend = f"{device_type}:{backend},cpu:gloo"
     return backend
 
@@ -266,6 +268,11 @@ def get_num_flop_per_token(num_params: int, model_config, seq_len) -> int:
         model_config.dim // model_config.n_heads,
         seq_len,
     )
+
+    # 结合 GPT 论文，C_forward= 2N+2*l*seq*d
+    # 后半部分是 attention 的计算量，由于 backward 阶段的计算量是 forward 的 2 倍
+    # C=6N+6*l*seq*d，但是 PALM 论文里面给的公式是 6N+12*l*seq*d，不知道咋来的 https://arxiv.org/pdf/2204.02311
+    # 作者还提到，如果使用了 flash attention 那么实际上应该是 6N+7*l*seq*d
     # Reasoning behind the factor of 12 for the self-attention part of the formula:
     # 1. each self-attention has 2 matmul in the forward and 4 in the backward (6)
     # 2. the flash attention does 1 more matmul recomputation in the backward

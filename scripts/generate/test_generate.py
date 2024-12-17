@@ -111,7 +111,7 @@ def test_generate(
     model_name = config.model.name
 
     logger.info(f"World Size: {world_size}, Local Rank: {local_rank} on {device}")
-
+    torch.distributed.checkpoint.format_utils
     # Tokenizer setup
     tokenizer = build_tokenizer(
         model_name_to_tokenizer[model_name], config.model.tokenizer_path
