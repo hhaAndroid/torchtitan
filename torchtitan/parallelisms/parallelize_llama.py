@@ -87,13 +87,14 @@ def parallelize_llama(
         # the mesh dim names of which the model params are sharded on
         dp_mesh_dim_names = []
         if parallel_dims.dp_replicate_enabled:
-            dp_mesh_dim_names.append("dp_replicate")
+            dp_mesh_dim_names.append("dp_replicate")  # 所有会复制参数的 mesh 组合
 
-        dp_mesh_dim_names.append("dp_shard_cp")
+        dp_mesh_dim_names.append("dp_shard_cp")  # 所有会切分参数的 mesh 组合
 
         apply_fsdp(
             model,
-            world_mesh[tuple(dp_mesh_dim_names)],
+            # 第一个维度是复制维度，第二个维度是切分维度，这样可以确保节点内切分，节点间复制
+            world_mesh[tuple(dp_mesh_dim_names)],  # 如果开启了 hsdp，那么这个地方返回的就是 2d mesh，否则就是 1d mesh
             param_dtype=TORCH_DTYPE_MAP[job_config.training.mixed_precision_param],
             reduce_dtype=TORCH_DTYPE_MAP[job_config.training.mixed_precision_reduce],
             pp_enabled=parallel_dims.pp_enabled,
@@ -261,6 +262,20 @@ def _apply_ac_to_transformer_block(module: nn.Module, ac_config):
                 to_save = func in _save_list and not (
                     func == torch.ops.aten.mm.default and meta[mm_count_key] % 2 == 0
                 )
+
+                # if not isinstance(args,tuple):
+                #   args = tuple(args)
+
+                # args_shape=[]
+                # for arg in args:
+                #     if isinstance(arg, torch.Tensor):
+                #         args_shape.append(arg.shape)
+                #     else:
+                #         args_shape.append(arg)
+                # True 表示不用重计算，False 为使用重计算，上述设置会导致
+                # attention 中的 wq 和 wv 不使用重计算，attention 中的其余模块全部使用重计算
+                # ffn 中的 w1/w3 不使用重计算，其余模块使用重计算
+                # print(func, args_shape, kwargs, meta, to_save)
                 return (
                     CheckpointPolicy.MUST_SAVE  # 不使用重计算，等于没有 ac
                     if to_save
